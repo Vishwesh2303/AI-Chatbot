@@ -1,15 +1,28 @@
 import React, { useState, useRef, useEffect, Suspense } from 'react';
 import axios from 'axios';
 import { Typewriter } from 'react-simple-typewriter';
-import { Send, User, Cpu } from 'lucide-react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Stage } from '@react-three/drei';
+import { Send, User, Cpu, Mic } from 'lucide-react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, useGLTF, Stage, useAnimations } from '@react-three/drei';
 import './Chatbot.css';
 
-// Iron Man Model Component
+// Iron Man Model with Animation
 const IronManModel = () => {
-  const { scene } = useGLTF('/models/iron_man.glb');
-  return <primitive object={scene} scale={0.8} position={[0, -1.2, 0]} />;
+  const group = useRef();
+  const { scene, animations } = useGLTF(`${process.env.PUBLIC_URL}/models/iron_man.glb`);
+  const { actions } = useAnimations(animations, scene);
+
+  useEffect(() => {
+    actions['Idle']?.play();
+  }, [actions]);
+
+  useFrame(({ mouse }) => {
+    if (group.current) {
+      group.current.rotation.y = mouse.x * Math.PI * 0.5;
+    }
+  });
+
+  return <primitive ref={group} object={scene} scale={1.2} position={[0, -1.5, 0]} />;
 };
 
 const Chatbot = () => {
@@ -28,35 +41,63 @@ const Chatbot = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Function to call Hugging Face Inference API
+  const speak = (text) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = speechSynthesis.getVoices().find((v) => v.lang === 'en-US');
+    speechSynthesis.speak(utterance);
+  };
+
   const fetchAIResponse = async (prompt) => {
   setLoading(true);
   try {
-    const response = await axios.post('http://localhost:4000/api/chat', { prompt });
-    if (Array.isArray(response.data) && response.data.length > 0) {
-      return response.data[0].generated_text || '🤖 Sorry, I could not generate a response.';
-    }
-    return '🤖 Sorry, I could not generate a response.';
+    const response = await axios.post(
+      'https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta',
+      {
+        inputs: prompt,
+      },
+      {
+        headers: {
+          Authorization: `Bearer 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`,
+        },
+      }
+    );
+    // HuggingFace returns different response format, e.g.
+    // response.data could be [{ generated_text: "some text" }]
+    return response.data[0]?.generated_text || '🤖 No response from model.';
   } catch (error) {
-    console.error('Error fetching AI response:', error.response || error.message || error);
-    return '🤖 Error: Unable to get response from AI server.';
+    if (error.response) {
+      console.error('HF API error response:', error.response.data);
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+    } else {
+      console.error('Error setting up HF request:', error.message);
+    }
+    return '🤖 Error: Unable to get response.';
   } finally {
     setLoading(false);
   }
 };
 
-
   const handleSend = async () => {
     if (!input.trim() || loading) return;
-
     const userMsg = { role: 'user', text: input };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
 
     const botResponse = await fetchAIResponse(input);
-
+    speak(botResponse);
     const botMsg = { role: 'bot', text: botResponse, typewriter: true };
     setMessages((prev) => [...prev, botMsg]);
+  };
+
+  const handleVoiceInput = () => {
+    const recognition = new window.webkitSpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.start();
+    recognition.onresult = (event) => {
+      setInput(event.results[0][0].transcript);
+      handleSend();
+    };
   };
 
   return (
@@ -76,7 +117,6 @@ const Chatbot = () => {
       </svg>
 
       <div className="chat-and-model">
-        {/* Chat Section */}
         <div className="chat-box">
           <div className="chat-messages">
             {messages.map((msg, idx) => (
@@ -124,14 +164,11 @@ const Chatbot = () => {
               autoFocus
               disabled={loading}
             />
-            <button type="submit" disabled={loading}>
-              <Send size={20} />
-              Send
-            </button>
+            <button type="button" onClick={handleVoiceInput}><Mic size={20} /></button>
+            <button type="submit" disabled={loading}><Send size={20} /> Send</button>
           </form>
         </div>
 
-        {/* 3D Model Section */}
         <div className="model-container">
           <Canvas camera={{ position: [0, 1, 5], fov: 45 }}>
             <ambientLight intensity={0.5} />

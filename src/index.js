@@ -8,8 +8,6 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <App />
-    <div className="text-4xl font-bold text-cyan-400">Tailwind is Working!</div>
-
   </React.StrictMode>
 );
 

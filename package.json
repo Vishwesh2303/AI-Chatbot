@@ -19,12 +19,15 @@
     "three": "^0.177.0",
     "web-vitals": "^2.1.4"
   },
+  "homepage": "https://vishwesh2303.github.io/AI-Chatbot",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "tailwind:init": "tailwindcss init -p"
+    "tailwind:init": "tailwindcss init -p",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"
   },
   "eslintConfig": {
     "extends": [
@@ -46,6 +49,7 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.21",
+    "gh-pages": "^6.3.0",
     "postcss": "^8.5.4",
     "tailwindcss": "^4.1.8"
   }
